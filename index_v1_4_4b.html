@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>HSK 1 — Study App (online-only v1.4.4b)</title>
+<meta name="theme-color" content="#0b0f14">
+<style>
+:root{
+  --bg:#0b0f14;--panel:#101722;--muted:#7d8ba3;--text:#e5ecfa;
+  --accent:#5bbcff;--accent-2:#a6e36a;--danger:#ff7b7b;--ok:#62d2a2;
+  --border:#1e2a3a;--font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Noto Sans SC",sans-serif;
+  --tone1:#9bd1ff; --tone2:#a6e36a; --tone3:#ffd56a; --tone4:#ff9aa2; --tone0:#c6d0e1;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font)}
+#app{max-width:1100px;margin:0 auto;padding:12px 12px 64px}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:10px;position:sticky;top:0;background:var(--bg);z-index:5}
+.logo{font-weight:800;letter-spacing:.5px;color:var(--accent)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{background:transparent;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 12px;cursor:pointer}
+.tab.active{border-color:var(--accent);color:var(--accent)}
+.panel{display:none;padding:12px;background:var(--panel);border:1px solid var(--border);border-radius:12px}
+.panel.active{display:block}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.card{background:#0e1622;border:1px solid var(--border);border-radius:12px;padding:12px}
+.card-title{color:var(--muted);font-weight:600;margin-bottom:8px}
+.card-body{display:grid;gap:10px}
+.primary,.ghost{padding:10px 14px;border-radius:10px;border:1px solid var(--border);cursor:pointer}
+.primary{background:var(--accent);color:#00121f;border-color:transparent;font-weight:700}
+.ghost{background:transparent;color:var(--text)}
+.primary:disabled,.ghost:disabled{opacity:.6;cursor:not-allowed}
+
+.flashcard{background:#0e1622;border:1px solid var(--border);border-radius:16px;padding:20px;text-align:center;user-select:none;position:relative}
+.card-side.hidden{display:none}
+/* front */
+.hanzi{font-size:64px;line-height:1.2;margin:6px 0 2px;display:flex;justify-content:center;gap:2px;flex-wrap:wrap}
+.hz-char{position:relative;padding:0 1px;border-radius:4px}
+.hz-ruby{position:absolute;left:50%;transform:translateX(-50%);bottom:100%;margin-bottom:6px;background:#0b1320;padding:2px 6px;border:1px solid var(--border);border-radius:6px;color:var(--accent-2);font-size:12px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .08s ease}
+.hz-char.show-ruby .hz-ruby{opacity:1}
+.pinyin-front{font-size:20px;margin-top:8px}
+.hint{color:var(--muted);font-size:13px}
+/* spoiler chips */
+.spoiler-chip{display:inline-block;min-width:22px;padding:2px 8px;margin:0 4px 4px 0;border:1px solid var(--border);border-radius:8px;background:#0f1a28;color:#7c8aa2;cursor:pointer;user-select:none}
+.spoiler-chip.revealed{background:transparent;border-color:transparent}
+.pf-controls{display:flex;gap:6px;justify-content:center;margin-top:6px}
+.pf-chip{padding:2px 8px;border:1px solid var(--border);border-radius:999px;background:#0f1a28;color:#9fb6d3;cursor:pointer}
+/* back */
+.pinyin{font-size:22px;margin-top:6px}
+.pinyin .tone1{color:var(--tone1)} .pinyin .tone2{color:var(--tone2)} .pinyin .tone3{color:var(--tone3)} .pinyin .tone4{color:var(--tone4)} .pinyin .tone0{color:var(--tone0)}
+.example{margin-top:8px;font-size:16px;color:#cfe4ff}
+.example-pinyin{margin-top:4px;font-size:15px}
+.example-pinyin .tone1{color:var(--tone1)} .example-pinyin .tone2{color:var(--tone2)} .example-pinyin .tone3{color:var(--tone3)} .example-pinyin .tone4{color:var(--tone4)} .example-pinyin .tone0{color:var(--tone0)}
+.tip{margin-top:10px;font-size:14px;color:var(--muted);border-top:1px dashed var(--border);padding-top:8px}
+.audio-row{display:flex;gap:8px;justify-content:center;margin-top:10px}
+
+.srs-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.srs-btn{padding:14px;border-radius:12px;border:1px solid var(--border);cursor:pointer}
+.again{background:#201018;color:#ffb2b2;border-color:#3a2026}
+.hard{background:#182018;color:#e4ffb2;border-color:#263a20}
+.good{background:#121c24;color:#bfe7ff;border-color:#243748}
+.easy{background:#0f1b13;color:#b9ffd8;border-color:#204430}
+.queue-info{color:var(--muted);margin-top:8px}
+
+/* one-hand mode */
+.onehand .srs-row{position:sticky;bottom:8px;grid-template-columns:1fr;gap:6px}
+.onehand .srs-btn{font-size:18px;padding:16px}
+
+.quiz-controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.quiz-card{background:#0e1622;border:1px solid var(--border);border-radius:12px;padding:12px}
+.quiz-q{font-size:26px;margin-bottom:6px}
+.quiz-sub{font-size:16px;color:var(--muted);margin-bottom:10px}
+.quiz-sub .tone1{color:var(--tone1)} .quiz-sub .tone2{color:var(--tone2)} .quiz-sub .tone3{color:var(--tone3)} .quiz-sub .tone4{color:var(--tone4)} .quiz-sub .tone0{color:var(--tone0)}
+.quiz-options{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+.quiz-opt{padding:10px;border:1px solid var(--border);border-radius:10px;cursor:pointer;background:#101a28}
+.quiz-opt.correct{border-color:var(--ok)}
+.quiz-opt.wrong{border-color:var(--danger)}
+.recap{margin-top:10px;border-top:1px dashed var(--border);padding-top:10px}
+
+.settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+label{display:grid;gap:6px;color:var(--muted)}
+input[type="number"],select,input[type='checkbox']{background:#0e1622;color:#e5ecfa;border:1px solid var(--border);border-radius:8px;padding:8px}
+
+footer{margin-top:14px;display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.muted{color:var(--muted)}
+
+/* progress heatmap */
+.heatmap{display:grid;grid-template-columns:repeat(13,1fr);gap:4px;margin-top:8px}
+.hm-col{display:grid;grid-template-rows:repeat(7,10px);gap:4px}
+.hm-cell{width:100%;height:10px;border-radius:2px;background:#0d1522;border:1px solid #0f1b2a}
+.hm-0{opacity:.35}
+.hm-1{background:#14324d}
+.hm-2{background:#1d4a73}
+.hm-3{background:#2a689e}
+.hm-4{background:#3d8bcf}
+.hm-5{background:#5bbcff}
+.goal{margin-top:8px}
+.goal-bar{height:10px;background:#0f1b2a;border:1px solid var(--border);border-radius:999px;overflow:hidden}
+.goal-fill{height:100%;background:var(--accent);width:0%}
+.goal-status{font-size:13px;color:var(--muted);margin-top:4px}
+
+@media (max-width:600px){.hanzi{font-size:48px}.pinyin{font-size:20px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="logo">HSK 1 · 500 — v1.4.4b (online)</div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="dashboard">Dashboard</button>
+      <button class="tab" data-tab="study">Study</button>
+      <button class="tab" data-tab="quiz">Quizzes</button>
+      <button class="tab" data-tab="notebook">Notebook</button>
+      <button class="tab" data-tab="progress">Progress</button>
+      <button class="tab" data-tab="settings">Settings</button>
+      <button class="tab" data-tab="importexport">Import/Export</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="dashboard" class="panel active">
+      <h1>New HSK 3.0 Band 1 — 500 words. Online-only.</h1>
+      <div id="net-status" class="muted">Loading dataset…</div>
+      <div class="cards">
+        <div class="card">
+          <div class="card-title">Today</div>
+          <div class="card-body">
+            <div id="today-stats"></div>
+            <div class="goal">
+              <div class="goal-bar"><div id="goal-fill" class="goal-fill"></div></div>
+              <div id="goal-status" class="goal-status">Goal: 60 min/day</div>
+            </div>
+            <button id="start-15" class="primary" disabled>Start · 15 new</button>
+            <button id="start-reviews" class="ghost" disabled>Review due</button>
+            <button id="start-today" class="ghost" disabled>Quick review (today)</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Progress</div>
+          <div class="card-body">
+            <div id="streak">Streak: 0</div>
+            <div id="xp">XP: 0 · Level 1</div>
+            <div id="badges" class="badges"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="study" class="panel">
+      <div class="study-wrap">
+        <div id="card-area" class="flashcard">
+          <div id="card-front" class="card-side">
+            <div id="hanzi" class="hanzi"></div>
+            <div id="pinyin-front" class="pinyin-front"></div>
+            <div id="pf-controls" class="pf-controls">
+              <button class="pf-chip" data-reveal="1">Reveal 1</button>
+              <button class="pf-chip" data-reveal="2">Reveal 2</button>
+              <button class="pf-chip" data-reveal="all">Reveal all</button>
+              <button class="pf-chip" data-reveal="hide">Hide</button>
+            </div>
+            <div class="hint">Tap card to reveal meaning (Space to flip)</div>
+          </div>
+          <div id="card-back" class="card-side hidden">
+            <div id="pinyin" class="pinyin"></div>
+            <div id="english" class="english"></div>
+            <div id="example" class="example"></div>
+            <div id="example-pinyin" class="example-pinyin"></div>
+            <div id="tip" class="tip"></div>
+            <div class="audio-row">
+              <button id="speak-word">Play word</button>
+              <button id="speak-sent">Play sentence</button>
+              <select id="rate">
+                <option value="0.5">0.5×</option>
+                <option value="1" selected>1×</option>
+                <option value="1.5">1.5×</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="srs-row">
+          <button class="srs-btn again" data-grade="0">Again (1)</button>
+          <button class="srs-btn hard" data-grade="3">Hard (2)</button>
+          <button class="srs-btn good" data-grade="4">Good (3)</button>
+          <button class="srs-btn easy" data-grade="5">Easy (4)</button>
+        </div>
+
+        <div class="queue-info" id="queue-info">Queue — New: 0 · Review: 0</div>
+      </div>
+    </section>
+
+    <section id="quiz" class="panel">
+      <h2>Quizzes</h2>
+      <div class="quiz-controls">
+        <button data-quiz="mcq" class="primary">Multiple Choice</button>
+        <button data-quiz="listening" class="ghost">Listening</button>
+        <button data-quiz="matching" class="ghost">Matching</button>
+        <button data-quiz="cloze" class="ghost">Cloze (missing word)</button>
+      </div>
+      <div id="quiz-area"></div>
+      <div id="quiz-recap" class="recap hidden"></div>
+    </section>
+
+    <section id="notebook" class="panel">
+      <h2>Notebook</h2>
+      <p class="muted">Review and take notes on words you’ve learned.</p>
+      <div class="notes-controls">
+        <div class="notes-filters">
+          <button class="filter active" data-range="today">Today</button>
+          <button class="filter" data-range="last3">Last 3 days</button>
+          <button class="filter" data-range="all">All learned</button>
+        </div>
+        <button id="copy-notes" class="ghost">Copy list</button>
+        <button id="download-notes" class="ghost">Download .txt</button>
+        <button id="refresh-notes" class="ghost">Refresh</button>
+      </div>
+      <div id="notes-list" class="notes-list"></div>
+    </section>
+
+    <section id="progress" class="panel">
+      <h2>Progress</h2>
+      <div id="progress-stats"></div>
+      <div class="tags">
+        <h3>By Tag</h3>
+        <div id="tag-progress"></div>
+      </div>
+      <h3>Study Heatmap (last 90 days)</h3>
+      <div id="heatmap" class="heatmap"></div>
+    </section>
+
+    <section id="settings" class="panel">
+      <h2>Settings</h2>
+      <div class="settings-grid">
+        <label>New cards / day
+          <input id="new-per-day" type="number" min="1" max="100" value="15" />
+        </label>
+        <label>Max reviews / day
+          <input id="max-reviews" type="number" min="20" max="999" value="999" />
+        </label>
+        <label>Show pinyin on front (always)
+          <input id="show-pinyin" type="checkbox" />
+        </label>
+        <label>Tone colors for pinyin
+          <input id="tone-colors" type="checkbox" checked />
+        </label>
+        <label>One-hand mode (bigger buttons)
+          <input id="one-hand" type="checkbox" />
+        </label>
+        <label>Dark theme
+          <input id="dark-theme" type="checkbox" checked />
+        </label>
+      </div>
+      <p class="muted">Data stays in your browser. Requires internet to load the list.</p>
+    </section>
+
+    <section id="importexport" class="panel">
+      <h2>Import / Export</h2>
+      <div class="import-export">
+        <button id="export-csv" class="ghost">Export progress CSV</button>
+        <input type="file" id="import-csv" accept=".csv" />
+        <label for="import-csv" class="primary">Import CSV</label>
+      </div>
+      <p class="muted">Format: simplified,pinyin,english,pos,tag</p>
+    </section>
+  </main>
+
+  <footer>
+    <div>Built for you · v1.4.4b</div>
+  </footer>
+</div>
+
+<script>
+// ===== Config
+const RAW_DATA_URL = "https://raw.githubusercontent.com/drkameleon/complete-hsk-vocabulary/main/wordlists/inclusive/new/1.min.json";
+const LS_KEYS = {
+  settings:"hsk1_settings",
+  progress:"hsk1_progress_v144",
+  streak:"hsk1_streak",
+  xp:"hsk1_xp",
+  badges:"hsk1_badges",
+  dataset:"hsk1_dataset_cache_v144",
+  activity:"hsk1_activity_v144"
+};
+
+// --- Migrate old progress once (from v1.4.1 key)
+(function migrateOldProgress(){
+  try{
+    if (!localStorage.getItem(LS_KEYS.progress)) {
+      const legacy = localStorage.getItem("hsk1_progress_v141");
+      if (legacy) localStorage.setItem(LS_KEYS.progress, legacy);
+    }
+  }catch(_){}
+})();
+
+// ===== Settings + theme
+const settings = loadSettings() || { newPerDay:15, maxReviews:999, showPinyin:false, darkTheme:true, toneColors:true, oneHand:false };
+applyTheme(settings.darkTheme);
+applyOneHand(settings.oneHand);
+
+// ===== State
+let WORDS = [];
+let QUEUE = { new:[], review:[] };
+let currentCard = null;
+let flipped = false;
+let notesRange = "today"; // today | last3 | all
+let frontSylls = []; // pinyin syllables for spoiler chips
+let studyTimer = null; // interval to record minutes
+
+// ===== Init
+(async function init(){
+  bindUI();
+  bindKeyboardShortcuts();
+  document.addEventListener("visibilitychange", ()=>{
+    if (document.hidden) stopStudyTimer();
+    else if (document.getElementById("study").classList.contains("active")) startStudyTimer();
+  });
+  await cleanupOldCaches();
+  await loadDatasetOnline();
+  rebuildTodayQueue();
+  updateDashboard();
+  enableStartButtons();
+  renderTagProgress();
+  renderNotes(); // initial
+  renderHeatmap();
+})();
+
+async function cleanupOldCaches(){
+  try{
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) await r.unregister();
+    }
+    if (window.caches && caches.keys) {
+      const keys = await caches.keys();
+      for (const k of keys) if (k.startsWith("hsk1-")) await caches.delete(k);
+    }
+  }catch(_){}
+}
+
+async function loadDatasetOnline(){
+  const status = document.getElementById("net-status");
+  try{
+    status.textContent = "Loading dataset from the internet…";
+    const res = await fetch(RAW_DATA_URL, { cache:"no-store" });
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const data = await res.json();
+    const tmp = data.map((e,idx)=>normalizeEntry(e,idx));
+    WORDS = dedupeWords(tmp);
+    try { localStorage.setItem(LS_KEYS.dataset, JSON.stringify(WORDS)); } catch(_){}
+    status.textContent = `Loaded ${WORDS.length} words.`;
+  }catch(e){
+    console.error(e);
+    const cached = localStorage.getItem(LS_KEYS.dataset);
+    if (cached) {
+      WORDS = JSON.parse(cached);
+      status.textContent = `Loaded ${WORDS.length} words (cached).`;
+    } else {
+      status.textContent = "Could not load the list. Check your internet and reload.";
+    }
+  }
+}
+
+function dedupeWords(arr){
+  const map = new Map();
+  for (const w of arr){
+    const k = w.hanzi + "|" + w.pinyin;
+    if (!map.has(k)) map.set(k, w);
+  }
+  return Array.from(map.values());
+}
+
+// --- Normalize + curated example pair (hanzi + pinyin)
+function normalizeEntry(entry, idx){
+  const form = (entry.f && entry.f[0]) || {};
+  const pinyin = (form.i && form.i.y) || (entry.i && entry.i.y) || entry.y || "";
+  const english = Array.isArray(form.m) ? form.m[0] : (entry.m && entry.m[0]) || (entry.english || "");
+  const pos = entry.p || [];
+  const tag = deriveTag({ p: pos, s: entry.s });
+  const epair = makeExamplePair(entry.s, pinyin, pos[0]||"n");
+  return { id: entry.s+"#"+idx, hanzi: entry.s, pinyin, english, pos, tag, example: epair[0], examplePinyin: epair[1] };
+}
+
+function deriveTag(e){
+  const p=(e.p && e.p[0])||"";
+  if (p==="q") return "measure word";
+  if (p==="m") return "number";
+  if (p==="r") return "pronoun";
+  if (p==="v") return "verb";
+  if (["a","ad","an","ag"].includes(p)) return "adjective";
+  if (p==="t") return "time";
+  return "general";
+}
+
+// Curated example patterns by POS, with simple collocations
+const Nouns = ["书","水","茶","苹果","中文","汉字","朋友","老师","学校","中国","北京"];
+const Places = ["学校","公司","家","商店"];
+const Times = ["今天","明天","现在","晚上"];
+const Foods = ["米饭","中国菜","面条","苹果"];
+function rnd(a){ return a[Math.floor(Math.random()*a.length)] }
+
+function makeExamplePair(hz, py, pos){
+  const P = py;
+  switch(pos){
+    case "v": {
+      const pick = Math.random();
+      if (pick < .34) return [`我${hz}${rnd(Foods)}。`, `wǒ ${P} ${pinyinOf(rnd(Foods))}。`];
+      if (pick < .67) { const plc=rnd(Places); return [`他在${plc}${hz}。`, `tā zài ${pinyinOf(plc)} ${P}。`]; }
+      return [`我们现在${hz}。`, `wǒmen xiànzài ${P}。`];
+    }
+    case "a": case "ad": case "an": case "ag": {
+      if (Math.random()<.5) return [`这个很${hz}。`, `zhège hěn ${P}。`];
+      return [`今天的天气很${hz}。`, `jīntiān de tiānqì hěn ${P}。`];
+    }
+    case "r": {
+      if (hz==="我"||hz==="你"||hz==="他"||hz==="她") return [`${hz}喜欢汉语。`, `${P} xǐhuan hànyǔ。`];
+      return [`${hz}在这儿。`, `${P} zài zhèr。`];
+    }
+    case "q": {
+      const n = rnd(["一","两","三","五"]);
+      const noun = rnd(Nouns);
+      return [`${n}${hz}${noun}。`, `${numberPin(n)} ${P} ${pinyinOf(noun)}。`];
+    }
+    case "m": {
+      const mw = rnd(["个","本","杯"]);
+      const noun = rnd(Nouns);
+      return [`${hz}${mw}${noun}。`, `${P} ${pinyinOf(mw)} ${pinyinOf(noun)}。`];
+    }
+    case "t": {
+      const t = rnd(Times);
+      return [`${t}${hz}见。`, `${pinyinOf(t)} ${P} jiàn。`];
+    }
+    default: {
+      if (Math.random()<.5) return [`这是${hz}。`, `zhè shì ${P}。`];
+      return [`我喜欢${hz}。`, `wǒ xǐhuan ${P}。`];
+    }
+  }
+}
+
+// simple hanzi->pinyin for the nouns above
+const SIMPLE_PINYIN = {
+  "书":"shū","水":"shuǐ","茶":"chá","苹果":"píngguǒ","中文":"zhōngwén","汉字":"hànzì","朋友":"péngyou","老师":"lǎoshī","学校":"xuéxiào","中国":"zhōngguó","北京":"běijīng",
+  "米饭":"mǐfàn","中国菜":"zhōngguó cài","面条":"miàntiáo",
+  "公司":"gōngsī","家":"jiā","商店":"shāngdiàn",
+  "今天":"jīntiān","明天":"míngtiān","现在":"xiànzài","晚上":"wǎnshang",
+  "个":"gè","本":"běn","杯":"bēi",
+  "一":"yī","两":"liǎng","三":"sān","五":"wǔ"
+};
+function pinyinOf(hz){ return SIMPLE_PINYIN[hz] || hz; }
+function numberPin(hz){ return SIMPLE_PINYIN[hz] || hz; }
+
+// ===== UI helpers
+function $(s){ return document.querySelector(s) }
+function $all(s){ return Array.from(document.querySelectorAll(s)) }
+
+function bindUI(){
+  $all(".tab").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
+  $("#card-area").addEventListener("click", (ev)=>{
+    const avoid = ev.target.closest(".spoiler-chip,.pf-chip,#pf-controls,.hz-char");
+    if (avoid) return;
+    flipped=!flipped; $("#card-front").classList.toggle("hidden", flipped); $("#card-back").classList.toggle("hidden", !flipped);
+  });
+  $all(".srs-btn").forEach(b=>b.addEventListener("click",()=>grade(b.dataset.grade)));
+  $("#start-15").addEventListener("click", ()=>{ settings.newPerDay=parseInt($("#new-per-day").value||"15",10); rebuildTodayQueue(true); if(QUEUE.new.length===0 && QUEUE.review.length===0){ buildTodayReviewQueue(); } switchTab("study"); startStudyTimer(); nextCard(); });
+  $("#start-reviews").addEventListener("click", ()=>{ rebuildTodayQueue(false); switchTab("study"); startStudyTimer(); nextCard(); });
+  $("#start-today").addEventListener("click", ()=>{ buildTodayReviewQueue(); switchTab("study"); startStudyTimer(); nextCard(); });
+  $("#speak-word").addEventListener("click",()=>speak(currentCard?.hanzi, parseFloat($("#rate").value)));
+  $("#speak-sent").addEventListener("click",()=>speak(currentCard?.example, parseFloat($("#rate").value)));
+  // settings
+  $("#new-per-day").value=settings.newPerDay; $("#max-reviews").value=settings.maxReviews; $("#show-pinyin").checked=settings.showPinyin; $("#dark-theme").checked=settings.darkTheme; $("#tone-colors").checked=settings.toneColors; $("#one-hand").checked=settings.oneHand;
+  $("#new-per-day").addEventListener("input",e=>saveSettings({newPerDay:parseInt(e.target.value,10)}));
+  $("#max-reviews").addEventListener("input",e=>saveSettings({maxReviews:parseInt(e.target.value,10)}));
+  $("#show-pinyin").addEventListener("change",e=>{ saveSettings({showPinyin:e.target.checked}); buildFrontSpoilers(); });
+  $("#tone-colors").addEventListener("change",e=>{ saveSettings({toneColors:e.target.checked}); refreshColorized(); });
+  $("#one-hand").addEventListener("change",e=>{ saveSettings({oneHand:e.target.checked}); applyOneHand(e.target.checked); });
+  $("#dark-theme").addEventListener("change",e=>{ saveSettings({darkTheme:e.target.checked}); applyTheme(e.target.checked); });
+  // quizzes
+  $all("[data-quiz]").forEach(b=>b.addEventListener("click",()=>startQuiz(b.dataset.quiz)));
+  // notebook
+  $all(".filter").forEach(b=>b.addEventListener("click",()=>{
+    $all(".filter").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    notesRange = b.dataset.range;
+    renderNotes();
+  }));
+  $("#copy-notes").addEventListener("click", copyNotes);
+  $("#download-notes").addEventListener("click", downloadNotes);
+  $("#refresh-notes").addEventListener("click", renderNotes);
+  // import/export WIRE-UP
+  const exp = document.getElementById("export-csv"); if (exp) exp.addEventListener("click", exportCSV);
+  const imp = document.getElementById("import-csv"); if (imp) imp.addEventListener("change", importCSV);
+}
+
+function bindKeyboardShortcuts(){
+  document.addEventListener("keydown",(e)=>{
+    if (document.getElementById("study").classList.contains("active")){
+      if (e.code==="Space"){
+        e.preventDefault();
+        flipped=!flipped;
+        document.getElementById("card-front").classList.toggle("hidden", flipped);
+        document.getElementById("card-back").classList.toggle("hidden", !flipped);
+      }
+      if (["Digit1","Numpad1","Digit2","Numpad2","Digit3","Numpad3","Digit4","Numpad4"].includes(e.code)){
+        const map={"Digit1":"0","Numpad1":"0","Digit2":"3","Numpad2":"3","Digit3":"4","Numpad3":"4","Digit4":"5","Numpad4":"5"};
+        grade(map[e.code]);
+      }
+      if (e.code==="ArrowRight"){
+        e.preventDefault();
+        const frontVisible = !document.getElementById("card-front").classList.contains("hidden");
+        if (frontVisible){
+          flipped = true;
+          document.getElementById("card-front").classList.add("hidden");
+          document.getElementById("card-back").classList.remove("hidden");
+        } else {
+          grade("4");
+        }
+      }
+    }
+  });
+}
+
+function enableStartButtons(){
+  const ok = Array.isArray(WORDS) && WORDS.length > 0;
+  ["start-15","start-reviews","start-today"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.disabled = !ok;
+  });
+  if (ok) document.getElementById("net-status").textContent="Dataset loaded. You’re ready.";
+}
+
+// Consecutive streak based on last active day
+function getStreak(){
+  const dateKey = LS_KEYS.streak;
+  const countKey = LS_KEYS.streak + "_count";
+  const todayStr = new Date().toDateString();
+  const last = localStorage.getItem(dateKey);
+  let count = parseInt(localStorage.getItem(countKey) || "0", 10);
+
+  if (last === todayStr) return count || 1;
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+  const yStr = yesterday.toDateString();
+
+  if (last === yStr) {
+    count = (count || 0) + 1;
+  } else {
+    count = 1; // reset streak
+  }
+  localStorage.setItem(dateKey, todayStr);
+  localStorage.setItem(countKey, String(count));
+  return count;
+}
+
+function switchTab(name){
+  $all(".panel").forEach(p=>p.classList.remove("active"));
+  $all(".tab").forEach(t=>t.classList.remove("active"));
+  document.getElementById(name).classList.add("active");
+  document.querySelector(`.tab[data-tab='${name}']`).classList.add("active");
+  if (name==="notebook") renderNotes();
+  if (name==="progress") renderHeatmap();
+  if (name!=="study") stopStudyTimer();
+}
+
+function applyTheme(dark){
+  document.documentElement.style.setProperty("--bg", dark ? "#0b0f14" : "#f4f8ff");
+  document.documentElement.style.setProperty("--panel", dark ? "#101722" : "#fff");
+  document.documentElement.style.setProperty("--text", dark ? "#e5ecfa" : "#0b0f14");
+}
+function applyOneHand(on){ document.body.classList.toggle("onehand", !!on); }
+
+// ===== Dashboard/progress
+function updateDashboard(){
+  const prog = loadProgress();
+  const due = Object.values(prog).filter(p=>p.due && new Date(p.due)<=today()).length;
+  const learned = Object.keys(prog).length;
+  $("#today-stats").textContent = `Learned: ${learned} · Due today: ${due} · Minutes today: ${getMinutesToday()}m`;
+  $("#streak").textContent = `Streak: ${getStreak()}`;
+  $("#xp").textContent = `XP: ${getXP()} · Level ${levelFromXP(getXP())}`;
+  renderBadges();
+  renderGoalBar();
+}
+
+function renderGoalBar(){
+  const mins = getMinutesToday();
+  const pct = Math.min(100, Math.round((mins/60)*100));
+  $("#goal-fill").style.width = pct + "%";
+  const left = Math.max(0, 60 - mins);
+  const msg = mins >= 60 ? "✅ On pace (60m done)" : `⏳ ${left} min to goal`;
+  $("#goal-status").textContent = "Goal: 60 min/day — " + msg;
+}
+
+function renderTagProgress(){
+  const prog = loadProgress(), counts = {};
+  for (const w of WORDS) {
+    counts[w.tag] = counts[w.tag] || { learned:0, total:0 };
+    counts[w.tag].total++;
+    if (prog[w.id]) counts[w.tag].learned++;
+  }
+  const dom = document.getElementById("tag-progress");
+  dom.innerHTML = Object.entries(counts).map(([tag,c])=>{
+    const pct = Math.round((c.learned/c.total)*100);
+    return `<div>${tag}: ${c.learned}/${c.total} (${pct}%)</div>`;
+  }).join("");
+}
+
+// ===== Queue & study
+function rebuildTodayQueue(includeNew=true){
+  const prog = loadProgress();
+  const due = WORDS.filter(w=>{ const p=prog[w.id]; return p && p.due && new Date(p.due)<=today(); });
+  let newOnes = [];
+  if (includeNew) {
+    const unseen = WORDS.filter(w=>!prog[w.id]);
+    newOnes = shuffle(unseen).slice(0, settings.newPerDay);
+  }
+  QUEUE.review = shuffle(due).slice(0, settings.maxReviews);
+  QUEUE.new = newOnes;
+  $("#queue-info").textContent = `Queue — New: ${QUEUE.new.length} · Review: ${QUEUE.review.length}`;
+}
+
+function buildTodayReviewQueue(){
+  const prog = loadProgress();
+  const seenToday = WORDS.filter(w=>{
+    const p=prog[w.id]; if(!p || !p.lastSeen) return false;
+    return isSameDay(new Date(p.lastSeen), today());
+  });
+  QUEUE.review = shuffle(seenToday);
+  QUEUE.new = [];
+  $("#queue-info").textContent = `Queue — New: ${QUEUE.new.length} · Review: ${QUEUE.review.length}`;
+}
+
+function nextCard(){
+  if (QUEUE.review.length) currentCard = QUEUE.review.shift();
+  else if (QUEUE.new.length) currentCard = QUEUE.new.shift();
+  else { alert("All done for now."); updateDashboard(); stopStudyTimer(); return; }
+
+  flipped=false; $("#card-front").classList.remove("hidden"); $("#card-back").classList.add("hidden");
+
+  // Front hanzi with per-char long-press ruby
+  renderHanziWithRuby(currentCard);
+  // Front: pinyin spoiler chips
+  buildFrontSpoilers();
+
+  // Back:
+  $("#pinyin").innerHTML = colorize(currentCard.pinyin);
+  $("#english").textContent=currentCard.english;
+  $("#example").textContent=currentCard.example;
+  $("#example-pinyin").innerHTML = colorize(currentCard.examplePinyin || "");
+  document.getElementById("tip").textContent = makeTip(currentCard);
+
+  $("#queue-info").textContent=`Queue — New: ${QUEUE.new.length} · Review: ${QUEUE.review.length}`;
+}
+
+function grade(val){
+  if (!currentCard) return;
+  const prog = loadProgress();
+  const now = today();
+  const nowISO = new Date().toISOString();
+  const rec = prog[currentCard.id] || { reps:0, interval:0, EF:2.5, due:now, lapses:0, learnedAt:null, lastSeen:null };
+  const g = parseInt(val,10);
+
+  rec.lastSeen = nowISO;
+  if (!rec.learnedAt) rec.learnedAt = nowISO;
+
+  if (g < 3) {
+    rec.reps = 0; rec.interval = 1; rec.due = addDays(now,1); rec.lapses = (rec.lapses||0)+1; addXP(5);
+  } else {
+    rec.reps += 1;
+    if (rec.reps === 1) rec.interval = 1;
+    else if (rec.reps === 2) rec.interval = 6;
+    else rec.interval = Math.round(rec.interval * rec.EF);
+    rec.EF = Math.max(1.3, rec.EF + (0.1 - (5 - g) * (0.08 + (5 - g) * 0.02)));
+    rec.due = addDays(now, rec.interval);
+    addXP(10 + g);
+  }
+  prog[currentCard.id] = rec;
+  saveProgress(prog);
+  incActivity("cards", 1);
+  nextCard();
+}
+
+// ===== Hanzi ruby (per-char long-press) with mismatch guard
+function renderHanziWithRuby(w){
+  const box = document.getElementById("hanzi");
+  box.innerHTML = "";
+  const chars = Array.from(w.hanzi);
+  const pStr = (w.pinyin || "").trim();
+  let sylls = pStr ? pStr.split(/\s+/) : [];
+  const mismatch = sylls.length !== chars.length;
+
+  chars.forEach((ch, i)=>{
+    const span = document.createElement("span");
+    span.className = "hz-char";
+    span.textContent = ch;
+    const ruby = document.createElement("div");
+    ruby.className = "hz-ruby";
+    ruby.textContent = mismatch ? pStr : (sylls[i] || "");
+    span.appendChild(ruby);
+
+    let timer=null;
+    span.addEventListener("pointerdown",()=>{ timer=setTimeout(()=>span.classList.add("show-ruby"),350); });
+    ["pointerup","pointerleave","pointercancel"].forEach(ev=>span.addEventListener(ev,()=>{ clearTimeout(timer); span.classList.remove("show-ruby"); }));
+    box.appendChild(span);
+  });
+}
+
+// ---- Pinyin spoilers (front)
+function buildFrontSpoilers(){
+  const box = document.getElementById("pinyin-front");
+  const controls = document.getElementById("pf-controls");
+  box.innerHTML = "";
+
+  if (!currentCard) { controls.style.display="none"; return; }
+
+  if (settings.showPinyin) {
+    controls.style.display = "none";
+    box.innerHTML = colorize(currentCard?.pinyin || "");
+    return;
+  }
+  const py = (currentCard?.pinyin || "").trim();
+  frontSylls = py ? py.split(/\s+/) : [];
+  if (!frontSylls.length) { controls.style.display="none"; return; }
+  controls.style.display = "";
+
+  frontSylls.forEach((syll, i)=>{
+    const span = document.createElement("span");
+    span.className = "spoiler-chip";
+    span.dataset.index = String(i);
+    span.innerHTML = "•••";
+    span.title = "Tap to reveal this syllable";
+    span.addEventListener("click", ()=>toggleChip(span, syll));
+    box.appendChild(span);
+  });
+
+  controls.querySelectorAll(".pf-chip").forEach(btn=>{
+    btn.onclick = ()=>{
+      const mode = btn.dataset.reveal;
+      if (mode === "1") revealFirstN(1);
+      else if (mode === "2") revealFirstN(2);
+      else if (mode === "all") revealAll();
+      else hideAll();
+    };
+  });
+}
+
+function toggleChip(el, syll){
+  const rev = el.classList.toggle("revealed");
+  el.innerHTML = rev ? colorize(syll) : "•••";
+}
+function revealFirstN(n){
+  const chips = Array.from(document.querySelectorAll("#pinyin-front .spoiler-chip"));
+  chips.forEach((c, idx)=>{
+    const syll = frontSylls[idx] || "";
+    if (idx < n) { c.classList.add("revealed"); c.innerHTML = colorize(syll); }
+    else { c.classList.remove("revealed"); c.innerHTML = "•••"; }
+  });
+}
+function revealAll(){
+  const chips = Array.from(document.querySelectorAll("#pinyin-front .spoiler-chip"));
+  chips.forEach((c, idx)=>{ c.classList.add("revealed"); c.innerHTML = colorize(frontSylls[idx] || ""); });
+}
+function hideAll(){
+  const chips = Array.from(document.querySelectorAll("#pinyin-front .spoiler-chip"));
+  chips.forEach(c=>{ c.classList.remove("revealed"); c.innerHTML = "•••"; });
+}
+
+// ---- Tone coloring
+function colorize(text){
+  if (!settings.toneColors) return escapeHtml(text);
+  const parts = (text||"").split(/(\s+)/);
+  return parts.map(part=>{
+    if (part.trim()==="") return part;
+    const tone = detectTone(part);
+    const cls = "tone"+tone;
+    return `<span class="${cls}">${escapeHtml(part)}</span>`;
+  }).join("");
+}
+function detectTone(syll){
+  const tone1 = "āēīōūǖĀĒĪŌŪǕ";
+  const tone2 = "áéíóúǘÁÉÍÓÚǗ";
+  const tone3 = "ǎěǐǒǔǚǍĚǏǑǓǙ";
+  const tone4 = "àèìòùǜÀÈÌÒÙǛ";
+  for (const ch of syll){
+    if (tone1.includes(ch)) return 1;
+    if (tone2.includes(ch)) return 2;
+    if (tone3.includes(ch)) return 3;
+    if (tone4.includes(ch)) return 4;
+  }
+  return 0;
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])) }
+function refreshColorized(){
+  if (currentCard){
+    buildFrontSpoilers();
+    $("#pinyin").innerHTML = colorize(currentCard.pinyin);
+    $("#example-pinyin").innerHTML = colorize(currentCard.examplePinyin||"");
+  }
+  // recolor active quizzes
+  document.querySelectorAll(".quiz-sub").forEach(el=>{
+    const raw = el.textContent; // strip any spans
+    el.innerHTML = colorize(raw);
+  });
+}
+
+// ---- Tips
+function makeTip(w){
+  const p = (w.pos && w.pos[0]) || "";
+  if (p==="a"||p==="ad"||p==="an"||p==="ag") return "Tip: Adjectives act like stative verbs. Use “很”(hěn) by default: 很" + w.hanzi + "。";
+  if (p==="v") return "Tip: Negate habits/present with “不”(bù): 我不" + w.hanzi + "。 Past non-completed often uses “没(有)”。";
+  if (p==="q") return "Tip: Measure word goes between number and noun: 一" + w.hanzi + " + [名词]。";
+  if (p==="m") return "Tip: Numbers usually need a measure word: 三个朋友、两本书。";
+  if (p==="r") return "Tip: Pronouns don’t inflect—plural with “们”: 我们、他们。";
+  if (p==="t") return "Tip: Time usually comes before the verb: 我们" + w.hanzi + "见。";
+  return "Tip: Read the whole sentence out loud with tones: " + w.pinyin + "。";
+}
+
+// ===== Notebook (filters)
+function renderNotes(){
+  const cont = document.getElementById("notes-list");
+  if (!cont) return;
+  const prog = loadProgress();
+  const items = getLearnedItems(notesRange, prog);
+  items.sort((a,b)=>{ // newest first
+    const pa = prog[a.id] || {};
+    const pb = prog[b.id] || {};
+    const ta = new Date(pa.lastSeen || pa.learnedAt || 0).getTime();
+    const tb = new Date(pb.lastSeen || pb.learnedAt || 0).getTime();
+    return tb - ta;
+  });
+  cont.innerHTML = items.length ? items.map(w=>`
+    <div class="note-item">
+      <div class="note-hz">${w.hanzi}</div>
+      <div class="note-py">${w.pinyin}</div>
+      <div class="note-en">${w.english}</div>
+      <div class="note-ex">${w.example}</div>
+    </div>
+  `).join("") : `<div class="muted">No items in this range yet.</div>`;
+}
+
+function getLearnedItems(range, prog){
+  return WORDS.filter(w=>{
+    const p = prog[w.id];
+    if (!p) return false;
+    const learned = p.learnedAt ? new Date(p.learnedAt) : null;
+    const seen = p.lastSeen ? new Date(p.lastSeen) : null;
+    if (range === "today") {
+      return (learned && isSameDay(learned, today())) || (seen && isSameDay(seen, today()));
+    }
+    if (range === "last3") {
+      return (learned && isWithinDays(learned, 3)) || (seen && isWithinDays(seen, 3));
+    }
+    if (range === "all") {
+      return !!(learned || seen);
+    }
+    return false;
+  });
+}
+
+function copyNotes(){
+  const prog = loadProgress();
+  const items = getLearnedItems(notesRange, prog);
+  const txt = items.map(w=>`${w.hanzi}  ${w.pinyin}  — ${w.english}\n例句: ${w.example}`).join("\n\n");
+  if (!txt) { alert("Nothing to copy in this range."); return; }
+  navigator.clipboard.writeText(txt).then(()=>alert("Copied."),()=>alert("Copy failed (browser blocked)."));
+}
+
+function downloadNotes(){
+  const prog = loadProgress();
+  const items = getLearnedItems(notesRange, prog);
+  const txt = items.map(w=>`${w.hanzi}\t${w.pinyin}\t${w.english}\n${w.example}`).join("\n\n");
+  if (!txt) { alert("Nothing to download in this range."); return; }
+  const date = new Date().toISOString().slice(0,10);
+  downloadFile(`hsk1_${notesRange}_${date}.txt`,"text/plain",txt);
+}
+
+// ===== Quizzes
+function startQuiz(type){
+  const area = $("#quiz-area");
+  area.innerHTML = "";
+  $("#quiz-recap").classList.add("hidden");
+  const pool = shuffle(WORDS).slice(0,10);
+  if (type==="mcq") runMCQ(pool);
+  if (type==="listening") runListening(pool);
+  if (type==="matching") runMatching(pool);
+  if (type==="cloze") runCloze(pool);
+}
+function runMCQ(pool){
+  const area=$("#quiz-area"); let i=0, correct=0, mistakes=[];
+  function render(){
+    if (i>=pool.length) return finish();
+    const w = pool[i];
+    area.innerHTML = `<div class="quiz-card"><div class="quiz-q">${w.hanzi}</div><div class="quiz-sub">${colorize(w.pinyin)}</div><div class="quiz-options"></div></div>`;
+    const opts = shuffle([w,...randomOthers(w,3)]).map(o=>o.english);
+    const box = area.querySelector(".quiz-options");
+    opts.forEach(opt=>{
+      const btn=document.createElement("button"); btn.className="quiz-opt"; btn.textContent=opt;
+      btn.onclick=()=>{ if (opt===w.english){ btn.classList.add("correct"); correct++; } else { btn.classList.add("wrong"); mistakes.push(w); } setTimeout(()=>{ i++; render(); },350); };
+      box.appendChild(btn);
+    });
+  }
+  function finish(){ recap(correct,pool.length,mistakes); }
+  render();
+}
+function runListening(pool){
+  const area=$("#quiz-area"); let i=0, correct=0, mistakes=[];
+  function render(){
+    if (i>=pool.length) return finish();
+    const w = pool[i];
+    area.innerHTML = `<div class="quiz-card">
+      <button class="primary" id="play">Play</button>
+      <div class="quiz-q">Type what you hear (hanzi or pinyin)</div>
+      <input id="type-in" />
+      <button id="submit" class="ghost">Check</button>
+    </div>`;
+    $("#play").onclick=()=>speak(w.hanzi,1);
+    $("#submit").onclick=()=>{ const val=$("#type-in").value.trim(); const ok=(val===w.hanzi)|| (normalizePinyin(val)===normalizePinyin(w.pinyin)); if(ok) correct++; else mistakes.push(w); i++; render(); };
+  }
+  function finish(){ recap(correct,pool.length,mistakes); }
+  render();
+}
+function runMatching(pool){
+  const area=$("#quiz-area");
+  const items=shuffle(pool).slice(0,6);
+  const left=items.map(w=>({id:w.id,label:`${w.hanzi} — ${w.pinyin}`,w}));
+  const right=shuffle(items.map(w=>({id:w.id,label:w.english})));
+  area.innerHTML = `<div class="quiz-card"><div class="quiz-q">Match pairs</div><div style="display:flex;gap:8px;"><div id="leftCol" style="flex:1;display:grid;gap:8px;"></div><div id="rightCol" style="flex:1;display:grid;gap:8px;"></div></div></div>`;
+  const leftCol=$("#leftCol"), rightCol=$("#rightCol");
+  let selected=null, matched=0, mistakes=[];
+  left.forEach(item=>{ const b=document.createElement("button"); b.className="quiz-opt"; b.textContent=item.label; b.onclick=()=>{ if(b.disabled) return; selected={...item,btn:b}; }; leftCol.appendChild(b); });
+  right.forEach(item=>{ const b=document.createElement("button"); b.className="quiz-opt"; b.textContent=item.label; b.onclick=()=>{ if(b.disabled||!selected) return; if(item.id===selected.id){ b.classList.add("correct"); selected.btn.classList.add("correct"); b.disabled=true; selected.btn.disabled=true; matched++; selected=null; if(matched===items.length) recap(items.length,items.length,mistakes); } else { b.classList.add("wrong"); selected.btn.classList.add("wrong"); mistakes.push(selected.w); setTimeout(()=>{ b.classList.remove("wrong"); selected.btn.classList.remove("wrong"); selected=null; },350); } }; rightCol.appendChild(b); });
+}
+function runCloze(pool){
+  const area=$("#quiz-area"); let i=0, correct=0, mistakes=[];
+  let attempts=0;
+  function render(){
+    if (i>=pool.length) return finish();
+    attempts = 0;
+    const w = pool[i];
+    area.innerHTML = `<div class="quiz-card">
+      <div class="quiz-q">${w.example.replace(w.hanzi,"____")}</div>
+      <div class="quiz-sub" id="clue"></div>
+      <div class="quiz-options"></div>
+    </div>`;
+    const options = shuffle([w,...randomOthers(w,3)]);
+    const box=area.querySelector(".quiz-options");
+    options.forEach(o=>{
+      const btn=document.createElement("button"); btn.className="quiz-opt"; btn.textContent=`${o.hanzi}`;
+      btn.onclick=()=>{
+        if(o.hanzi===w.hanzi){
+          btn.classList.add("correct"); correct++; setTimeout(()=>{ i++; render(); },350);
+        } else {
+          btn.classList.add("wrong");
+          if (attempts===0){
+            mistakes.push(w);
+            attempts=1;
+            document.getElementById("clue").innerHTML = "Hint: " + colorize(w.pinyin);
+            btn.disabled = true;
+          } else {
+            setTimeout(()=>{ i++; render(); },350);
+          }
+        }
+      };
+      box.appendChild(btn);
+    });
+  }
+  function finish(){ recap(correct,pool.length,mistakes); }
+  render();
+}
+function recap(correct,total,mistakes){
+  const box=$("#quiz-recap");
+  box.classList.remove("hidden");
+  box.innerHTML = `<strong>Score:</strong> ${correct}/${total}. Mistakes: ${mistakes && mistakes.length ? mistakes.map(w=>w.hanzi).join("、") : "None"}`;
+}
+
+// ===== Heatmap + activity/time tracking
+function getActivity(){
+  try { return JSON.parse(localStorage.getItem(LS_KEYS.activity)) || {}; } catch { return {}; }
+}
+function setActivity(obj){
+  localStorage.setItem(LS_KEYS.activity, JSON.stringify(obj));
+}
+function todayKey(){ return new Date().toISOString().slice(0,10); }
+function incActivity(field, n){
+  const act = getActivity();
+  const k = todayKey();
+  act[k] = act[k] || { mins:0, cards:0 };
+  act[k][field] = (act[k][field]||0) + n;
+  setActivity(act);
+  updateDashboard();
+  renderHeatmap();
+}
+function getMinutesToday(){ const act=getActivity(); const k=todayKey(); return (act[k] && act[k].mins) || 0; }
+function startStudyTimer(){
+  if (studyTimer) return;
+  studyTimer = setInterval(()=>{ incActivity("mins", 1); }, 60*1000);
+}
+function stopStudyTimer(){
+  if (studyTimer){ clearInterval(studyTimer); studyTimer=null; }
+}
+function renderHeatmap(){
+  const root = document.getElementById("heatmap");
+  if (!root) return;
+  const act = getActivity();
+  root.innerHTML = "";
+  const cols = 13;
+  const end = new Date(); end.setHours(0,0,0,0);
+  for (let c=cols-1;c>=0;c--){
+    const col = document.createElement("div"); col.className="hm-col";
+    for (let r=0;r<7;r++){
+      const cell = document.createElement("div"); cell.className="hm-cell hm-0";
+      const d = new Date(end.getTime() - ((c*7 + (6-r)) * 86400000));
+      const key = d.toISOString().slice(0,10);
+      const score = (act[key]?.mins || 0) + Math.floor((act[key]?.cards || 0)/5);
+      let lvl = 0;
+      if (score>0) lvl=1;
+      if (score>=10) lvl=2;
+      if (score>=25) lvl=3;
+      if (score>=45) lvl=4;
+      if (score>=60) lvl=5;
+      cell.className = "hm-cell hm-"+lvl;
+      col.appendChild(cell);
+    }
+    root.appendChild(col);
+  }
+}
+
+// ===== Helpers & persistence
+function randomOthers(exclude,n){ const pool=WORDS.filter(w=>w.hanzi!==exclude.hanzi); return shuffle(pool).slice(0,n) }
+function normalizePinyin(p){ return (p||"").toLowerCase().replace(/\s+/g,"").normalize("NFD").replace(/[\u0300-\u036f]/g,"") }
+function today(){ const d=new Date(); d.setHours(0,0,0,0); return d }
+function isSameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate() }
+function isWithinDays(dt, days){ const t=today().getTime(); const d0=new Date(dt); d0.setHours(0,0,0,0); return (t - d0.getTime()) <= (days-1)*86400000 }
+function addDays(date,n){ return new Date(date.getTime()+n*86400000) }
+function shuffle(a){ return a.slice().sort(()=>Math.random()-0.5) }
+
+function loadProgress(){ try{ return JSON.parse(localStorage.getItem(LS_KEYS.progress))||{} }catch{ return {} } }
+function saveProgress(o){ localStorage.setItem(LS_KEYS.progress, JSON.stringify(o)) }
+
+function loadSettings(){ try{ return JSON.parse(localStorage.getItem(LS_KEYS.settings)) }catch{ return null } }
+function saveSettings(p){ const next={...(loadSettings()||settings),...p}; localStorage.setItem(LS_KEYS.settings, JSON.stringify(next)); Object.assign(settings,next) }
+
+function getXP(){ return parseInt(localStorage.getItem(LS_KEYS.xp)||"0",10) }
+function addXP(n){ localStorage.setItem(LS_KEYS.xp, String(getXP()+n)); updateDashboard() }
+function levelFromXP(xp){ return Math.floor(Math.sqrt(xp/50))+1 }
+
+// speech with basic zh voice pick
+let cachedVoice=null;
+function pickZhVoice(){
+  try{
+    const voices = speechSynthesis.getVoices();
+    const zh = voices.filter(v=>/zh|chinese|mandarin/i.test(v.lang+ " " + v.name));
+    return zh[0] || voices.find(v=>v.lang && v.lang.toLowerCase().startsWith("zh")) || null;
+  }catch(_){ return null; }
+}
+if ('speechSynthesis' in window){
+  speechSynthesis.onvoiceschanged = ()=>{ cachedVoice = pickZhVoice(); };
+  cachedVoice = pickZhVoice();
+}
+function speak(text, rate=1){
+  if(!window.speechSynthesis){ alert("Speech synthesis not supported."); return; }
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang="zh-CN"; u.rate=rate; if(cachedVoice) u.voice=cachedVoice;
+  speechSynthesis.speak(u);
+}
+
+// CSV
+function exportCSV(){
+  const prog = loadProgress();
+  const rows=[["simplified","pinyin","english","pos","tag","reps","interval","due","EF","lapses","learnedAt","lastSeen"]];
+  for(const w of WORDS){
+    const p=prog[w.id]||{};
+    rows.push([w.hanzi,w.pinyin,w.english,(w.pos||[]).join("/"),w.tag,p.reps||0,p.interval||0,p.due||"",p.EF||2.5,p.lapses||0,p.learnedAt||"",p.lastSeen||""]);
+  }
+  const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  downloadFile("hsk1_progress.csv","text/csv",csv);
+}
+function importCSV(evt){
+  const f=evt.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    const lines=r.result.split(/\r?\n/).filter(Boolean); lines.shift();
+    const prog=loadProgress();
+    for(const line of lines){
+      const cols=parseCSVLine(line);
+      const [hanzi,pinyin,english,pos,tag,reps,interval,due,EF,lapses,learnedAt,lastSeen]=cols;
+      const w=WORDS.find(x=>x.hanzi===hanzi && x.pinyin===pinyin);
+      if(!w) continue;
+      const rep = Math.max(0, parseInt(reps||"0",10));
+      const ivl = Math.max(0, parseInt(interval||"0",10));
+      const ef  = Math.max(1.3, parseFloat(EF||"2.5") || 2.5);
+      const laps= Math.max(0, parseInt(lapses||"0",10));
+      const dueDate = (new Date(due)).toString()==="Invalid Date" ? today() : new Date(due);
+      prog[w.id]={reps:rep,interval:ivl,due:dueDate,EF:ef,lapses:laps,learnedAt:learnedAt||null,lastSeen:lastSeen||null};
+    }
+    saveProgress(prog); alert("Import complete."); updateDashboard(); renderNotes(); renderHeatmap();
+  };
+  r.readAsText(f);
+}
+function parseCSVLine(s){
+  const out=[]; let i=0,cur="",inQ=false;
+  while(i<s.length){ const ch=s[i++]; if(ch==='"'){ if(inQ && s[i]==='"'){cur+='"'; i++;} else inQ=!inQ; }
+  else if(ch==="," && !inQ){ out.push(cur); cur=""; } else cur+=ch; }
+  out.push(cur); return out;
+}
+function downloadFile(name,mime,content){
+  const blob=new Blob([content],{type:mime});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+}
+</script>
+</body>
+</html>
