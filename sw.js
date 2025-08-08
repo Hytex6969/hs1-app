@@ -1,5 +1,5 @@
-// Simple service worker for offline app shell
-const CACHE = "hsk1-v1.2";
+// Service worker for offline app shell
+const CACHE = "hsk1-v1.3.1";
 const ASSETS = [
   "./",
   "./index.html",

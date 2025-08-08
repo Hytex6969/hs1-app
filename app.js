@@ -1,19 +1,16 @@
-// v1.2 — baked local dataset first, bake button, offline stroke cache, service worker
+// v1.3.1 — removed Typing quiz; Listening hides answers; Matching uses click-pair matcher
 const RAW_DATA_URL = "https://raw.githubusercontent.com/drkameleon/complete-hsk-vocabulary/main/wordlists/inclusive/new/1.min.json";
 
 const LS_KEYS = {
   settings: "hsk1_settings",
-  progress: "hsk1_progress_v12",
-  history: "hsk1_history",
+  progress: "hsk1_progress_v131",
   streak: "hsk1_streak",
   xp: "hsk1_xp",
   badges: "hsk1_badges",
-  recordings: "hsk1_recordings",
-  offlineWords: "hsk1_offline_words_v12",
-  strokePrefix: "hw3_char_" // + codepoint hex
+  offlineWords: "hsk1_offline_words_v12"
 };
 
-const LOCAL_DATA_URL = "data/hsk1_500.json"; // baked file
+const LOCAL_DATA_URL = "data/hsk1_500.json";
 
 const settings = loadSettings() || {
   newPerDay: 15,
@@ -26,10 +23,10 @@ const settings = loadSettings() || {
 applyTheme(settings.darkTheme);
 
 const FALLBACK = [
-  { s: "你好", i: { y: "nǐ hǎo" }, f:[{ m:["hello"] }], p: ["i"] },
-  { s: "谢谢", i: { y: "xièxie" }, f:[{ m:["thanks; thank you"] }], p: ["i"] },
-  { s: "对不起", i: { y: "duìbuqǐ" }, f:[{ m:["sorry"] }], p: ["i"] },
-  { s: "请", i: { y: "qǐng" }, f:[{ m:["please; to invite"] }], p: ["v"] }
+  { s: "你好", f:[{ i:{ y: "nǐ hǎo" }, m:["hello"] }], p: ["i"] },
+  { s: "谢谢", f:[{ i:{ y: "xièxie" }, m:["thanks"] }], p: ["i"] },
+  { s: "对不起", f:[{ i:{ y: "duìbuqǐ" }, m:["sorry"] }], p: ["i"] },
+  { s: "请", f:[{ i:{ y: "qǐng" }, m:["please; to invite"] }], p: ["v"] }
 ];
 
 let WORDS = [];
@@ -43,11 +40,9 @@ let flipped = false;
   rebuildTodayQueue();
   updateDashboard();
   renderTagProgress();
-  initStrokeUI();
 })();
 
 async function loadDataset() {
-  // 1) Use baked local JSON
   try {
     const resLocal = await fetch(LOCAL_DATA_URL, { cache: "no-store" });
     if (resLocal.ok) {
@@ -59,7 +54,6 @@ async function loadDataset() {
       }
     }
   } catch {}
-  // 2) Use Offline Pack (from v1.1 / bake button)
   const cached = localStorage.getItem(LS_KEYS.offlineWords);
   if (cached) {
     try {
@@ -69,7 +63,6 @@ async function loadDataset() {
       return;
     } catch {}
   }
-  // 3) Last resort: online raw
   try {
     const res = await fetch(RAW_DATA_URL, { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -77,9 +70,8 @@ async function loadDataset() {
     WORDS = data.map((entry, idx) => normalizeEntry(entry, idx));
     setBakeStatus(false, `Loaded from internet: ${WORDS.length} (click Bake to save locally)`);
   } catch (e) {
-    console.warn("Falling back to built-in sample:", e);
     WORDS = FALLBACK.map((e, idx) => normalizeEntry(e, idx));
-    setBakeStatus(false, "Using minimal built‑in sample (go online then click Bake).");
+    setBakeStatus(false, "Using minimal built-in sample (go online then click Bake).");
   }
 }
 
@@ -88,11 +80,10 @@ function setBakeStatus(ok, msg) {
   if (el) el.textContent = msg;
 }
 
-// Normalize entries
 function normalizeEntry(entry, idx) {
-  // Works with drkameleon dataset + our fallback
-  const pinyin = entry.i?.y || entry.y || "";
-  const english = Array.isArray(entry.f?.[0]?.m) ? entry.f[0].m[0] : (entry.english || "");
+  const form = (entry.f && entry.f[0]) || {};
+  const pinyin = form.i?.y || entry.i?.y || entry.y || "";
+  const english = Array.isArray(form.m) ? form.m[0] : (entry.english || "");
   const pos = entry.p || [];
   const tag = deriveTag({ p: pos, s: entry.s });
   return {
@@ -145,11 +136,9 @@ function bindUI() {
   $all(".srs-btn").forEach(b => b.addEventListener("click", () => grade(b.dataset.grade)));
   $("#start-15").addEventListener("click", () => { settings.newPerDay = parseInt($("#new-per-day").value || "15", 10); rebuildTodayQueue(true); switchTab("study"); nextCard(); });
   $("#start-reviews").addEventListener("click", () => { rebuildTodayQueue(false); switchTab("study"); nextCard(); });
-  $("#start-guided").addEventListener("click", () => { switchTab("guided"); });
   $("#speak-word").addEventListener("click", () => speak(currentCard?.hanzi, parseFloat($("#rate").value)));
   $("#speak-sent").addEventListener("click", () => speak(currentCard?.example, parseFloat($("#rate").value)));
 
-  // Settings
   $("#new-per-day").value = settings.newPerDay;
   $("#max-reviews").value = settings.maxReviews;
   $("#session-mins").value = settings.sessionMins;
@@ -161,27 +150,14 @@ function bindUI() {
   $("#show-pinyin").addEventListener("change", e => saveSettings({ showPinyin: e.target.checked }));
   $("#dark-theme").addEventListener("change", e => { saveSettings({ darkTheme: e.target.checked }); applyTheme(e.target.checked); });
 
-  // Quizzes
   $all("[data-quiz]").forEach(b => b.addEventListener("click", () => startQuiz(b.dataset.quiz)));
 
-  // Import/Export
   $("#export-csv").addEventListener("click", exportCSV);
   $("#import-csv").addEventListener("change", importCSV);
 
-  // Recorder
-  setupRecorder();
-
-  // Baking & strokes
   $("#bake-data").addEventListener("click", bakeDataNow);
   $("#bake-data-2").addEventListener("click", bakeDataNow);
   $("#download-dataset").addEventListener("click", downloadCurrentDataset);
-  $("#cache-strokes").addEventListener("click", cacheStrokes);
-  $("#cache-strokes-2").addEventListener("click", cacheStrokes);
-
-  // Guided controls
-  $("#guided-begin").addEventListener("click", beginGuided);
-  $("#guided-end").addEventListener("click", endGuided);
-  $("#guided-skip").addEventListener("click", nextGuidedStage);
 }
 
 function switchTab(name) {
@@ -202,7 +178,7 @@ function updateDashboard() {
   const due = Object.values(prog).filter(p => new Date(p.due) <= today()).length;
   const learned = Object.keys(prog).length;
   $("#today-stats").textContent = `Learned: ${learned} · Due today: ${due}`;
-  $("#streak").textContent = `Streak: ${getStreak()}🔥`;
+  $("#streak").textContent = `Streak: ${getStreak()}`;
   $("#xp").textContent = `XP: ${getXP()} · Level ${levelFromXP(getXP())}`;
   renderBadges();
 }
@@ -227,13 +203,14 @@ function rebuildTodayQueue(includeNew=true) {
 function nextCard() {
   if (QUEUE.review.length) currentCard = QUEUE.review.shift();
   else if (QUEUE.new.length) currentCard = QUEUE.new.shift();
-  else { alert("All done for now! 🎉"); updateDashboard(); return; }
+  else { alert("All done for now."); updateDashboard(); return; }
 
   flipped = false;
   $("#card-front").classList.remove("hidden");
   $("#card-back").classList.add("hidden");
   $("#hanzi").textContent = currentCard.hanzi;
-  $("#pinyin").textContent = settings.showPinyin ? currentCard.pinyin : "• • •";
+  $("#pinyin-front").textContent = settings.showPinyin ? currentCard.pinyin : "";
+  $("#pinyin").textContent = currentCard.pinyin;
   $("#english").textContent = currentCard.english;
   $("#example").textContent = currentCard.example;
   $("#queue-info").textContent = `Queue — New: ${QUEUE.new.length} · Review: ${QUEUE.review.length}`;
@@ -246,7 +223,7 @@ function grade(gradeValue) {
   const rec = prog[currentCard.id] || { reps: 0, interval: 0, EF: 2.5, due: now, lapses: 0 };
   const grade = parseInt(gradeValue, 10);
 
-  if (grade < 3) { // fail
+  if (grade < 3) {
     rec.reps = 0;
     rec.interval = 1;
     rec.due = addDays(now, 1);
@@ -266,7 +243,7 @@ function grade(gradeValue) {
   nextCard();
 }
 
-// ===== Misc utils
+// ===== Utilities
 function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
 function addDays(date, n) { return new Date(date.getTime() + n * 86400000); }
 function shuffle(arr) { return arr.slice().sort(() => Math.random() - 0.5); }
@@ -298,17 +275,16 @@ function renderBadges() {
   if (xp >= 100) badges.push("Tone Trainee");
   if (xp >= 300) badges.push("Tone Master");
   if (xp >= 600) badges.push("HSK 1 Hero");
-  $("#badges").innerHTML = badges.map(b => `<span class="badge">${b}</span>`).join("") || "—";
+  $("#badges").innerHTML = badges.map(b => `<span class="badge">${b}</span>`).join("") || "";
 }
 
-// ===== Quizzes (same as v1.1)
+// ===== Quizzes
 function startQuiz(type) {
   const area = $("#quiz-area");
   area.innerHTML = "";
   $("#quiz-recap").classList.add("hidden");
   const pool = shuffle(WORDS).slice(0, 10);
   if (type === "mcq") runMCQ(pool);
-  if (type === "typing") runTyping(pool);
   if (type === "listening") runListening(pool);
   if (type === "matching") runMatching(pool);
   if (type === "cloze") runCloze(pool);
@@ -322,6 +298,7 @@ function runMCQ(pool) {
     const w = pool[i];
     area.innerHTML = `<div class="quiz-card">
       <div class="quiz-q">${w.hanzi}</div>
+      <div class="quiz-sub">${w.pinyin}</div>
       <div class="quiz-options"></div>
     </div>`;
     const opts = shuffle([w, ...randomOthers(w, 3)]).map(o => o.english);
@@ -333,33 +310,10 @@ function runMCQ(pool) {
       btn.onclick = () => {
         if (opt === w.english) { btn.classList.add("correct"); correct++; }
         else { btn.classList.add("wrong"); mistakes.push(w); }
-        setTimeout(()=> { i++; render(); }, 400);
+        setTimeout(()=> { i++; render(); }, 350);
       };
       box.appendChild(btn);
     });
-  }
-  function finish() { recap(correct, pool.length, mistakes); }
-  render();
-}
-
-function runTyping(pool) {
-  const area = $("#quiz-area");
-  let i = 0, correct = 0, mistakes = [];
-  function render() {
-    if (i >= pool.length) return finish();
-    const w = pool[i];
-    area.innerHTML = `<div class="quiz-card">
-      <div class="quiz-q">${w.hanzi} — type pinyin (with tones)</div>
-      <input id="type-in" placeholder="e.g., nǐ hǎo" />
-      <button id="submit" class="primary">Check</button>
-      <div class="muted">Answer: ${w.pinyin}</div>
-    </div>`;
-    $("#submit").onclick = ()=>{
-      const val = $("#type-in").value.trim();
-      if (normalizePinyin(val) === normalizePinyin(w.pinyin)) { correct++; }
-      else mistakes.push(w);
-      i++; render();
-    };
   }
   function finish() { recap(correct, pool.length, mistakes); }
   render();
@@ -372,11 +326,10 @@ function runListening(pool) {
     if (i >= pool.length) return finish();
     const w = pool[i];
     area.innerHTML = `<div class="quiz-card">
-      <button class="primary" id="play">🔊 Play</button>
+      <button class="primary" id="play">Play</button>
       <div class="quiz-q">Type what you hear (hanzi or pinyin)</div>
       <input id="type-in" />
       <button id="submit" class="ghost">Check</button>
-      <div class="muted">Target: ${w.hanzi} — ${w.pinyin}</div>
     </div>`;
     $("#play").onclick = ()=> speak(w.hanzi, 1);
     $("#submit").onclick = ()=> {
@@ -392,27 +345,49 @@ function runListening(pool) {
 
 function runMatching(pool) {
   const area = $("#quiz-area");
-  const left = pool.map(w => ({...w}));
-  const right = shuffle(pool.map(w => w.english));
+  const items = shuffle(pool).slice(0, 6); // 6 pairs
+  const left = items.map(w => ({ id: w.id, label: `${w.hanzi} — ${w.pinyin}`, w }));
+  const right = shuffle(items.map(w => ({ id: w.id, label: w.english })));
+
   area.innerHTML = `<div class="quiz-card">
-    <div class="quiz-q">Match Hanzi → English</div>
-    <div class="quiz-options"></div>
+    <div class="quiz-q">Match pairs</div>
+    <div style="display:flex; gap:8px;">
+      <div id="leftCol"  style="flex:1; display:grid; gap:8px;"></div>
+      <div id="rightCol" style="flex:1; display:grid; gap:8px;"></div>
+    </div>
   </div>`;
-  const box = area.querySelector(".quiz-options");
-  left.forEach((w, idx) => {
-    const sel = document.createElement("select");
-    sel.innerHTML = `<option value="">${w.hanzi}</option>` + right.map(r => `<option>${r}</option>`).join("");
-    sel.onchange = ()=> { w.choice = sel.value; }
-    box.appendChild(sel);
+
+  const leftCol  = $("#leftCol");
+  const rightCol = $("#rightCol");
+  let selected = null, matched = 0, mistakes = [];
+
+  left.forEach(item => {
+    const b = document.createElement("button");
+    b.className = "quiz-opt";
+    b.textContent = item.label;
+    b.onclick = () => { if (b.disabled) return; selected = { ...item, btn: b }; };
+    leftCol.appendChild(b);
   });
-  const btn = document.createElement("button");
-  btn.textContent = "Check";
-  btn.className = "primary";
-  btn.onclick = ()=> {
-    const mistakes = left.filter(w => w.choice !== w.english);
-    recap(pool.length - mistakes.length, pool.length, mistakes);
-  };
-  area.appendChild(btn);
+
+  right.forEach(item => {
+    const b = document.createElement("button");
+    b.className = "quiz-opt";
+    b.textContent = item.label;
+    b.onclick = () => {
+      if (b.disabled || !selected) return;
+      if (item.id === selected.id) {
+        b.classList.add("correct"); selected.btn.classList.add("correct");
+        b.disabled = true; selected.btn.disabled = true;
+        matched++; selected = null;
+        if (matched === items.length) recap(items.length, items.length, []);
+      } else {
+        b.classList.add("wrong"); selected.btn.classList.add("wrong");
+        mistakes.push(selected.w);
+        setTimeout(() => { b.classList.remove("wrong"); selected.btn.classList.remove("wrong"); selected = null; }, 350);
+      }
+    };
+    rightCol.appendChild(b);
+  });
 }
 
 function runCloze(pool) {
@@ -425,17 +400,18 @@ function runCloze(pool) {
     const options = shuffle([w, ...randomOthers(w, 3)]);
     area.innerHTML = `<div class="quiz-card">
       <div class="quiz-q">${sentence}</div>
+      <div class="quiz-sub">Answer: ${w.hanzi} — ${w.pinyin}</div>
       <div class="quiz-options"></div>
     </div>`;
     const box = area.querySelector(".quiz-options");
     options.forEach(o => {
       const btn = document.createElement("button");
       btn.className = "quiz-opt";
-      btn.textContent = o.hanzi;
+      btn.textContent = `${o.hanzi}`;
       btn.onclick = () => {
         if (o.hanzi === w.hanzi) { btn.classList.add("correct"); correct++; }
         else { btn.classList.add("wrong"); mistakes.push(w); }
-        setTimeout(()=> { i++; render(); }, 400);
+        setTimeout(()=> { i++; render(); }, 350);
       };
       box.appendChild(btn);
     });
@@ -447,7 +423,7 @@ function runCloze(pool) {
 function recap(correct, total, mistakes) {
   const box = $("#quiz-recap");
   box.classList.remove("hidden");
-  box.innerHTML = `<strong>Score:</strong> ${correct}/${total}. Mistakes: ${mistakes.map(w=>w.hanzi).join("、") || "—"}`;
+  box.innerHTML = `<strong>Score:</strong> ${correct}/${total}. Mistakes: ${mistakes.map(w=>w.hanzi).join("、") || "None"}`;
 }
 
 // Helpers
@@ -456,240 +432,6 @@ function randomOthers(exclude, n) {
   return shuffle(pool).slice(0, n);
 }
 function normalizePinyin(p) { return (p || "").toLowerCase().replace(/\s+/g,"").normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
-
-// ===== Recorder
-let mediaRecorder, chunks = [];
-async function setupRecorder() {
-  if (!navigator.mediaDevices?.getUserMedia) return;
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
-    mediaRecorder.ondataavailable = e => chunks.push(e.data);
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(chunks, { type: "audio/webm" });
-      chunks = [];
-      const url = URL.createObjectURL(blob);
-      $("#rec-playback").src = url;
-    };
-    $("#rec-start").onclick = () => { mediaRecorder.start(); $("#rec-start").disabled = true; $("#rec-stop").disabled = false; };
-    $("#rec-stop").onclick = () => { mediaRecorder.stop(); $("#rec-start").disabled = false; $("#rec-stop").disabled = true; };
-    $("#rec-save").onclick = saveRecording;
-  } catch (e) {
-    console.warn("Recorder init failed", e);
-  }
-}
-function saveRecording() {
-  const url = $("#rec-playback").src;
-  if (!url) { alert("Record first."); return; }
-  const target = $("#speak-target").value;
-  const notes = $("#rec-notes").value.trim();
-  const recs = JSON.parse(localStorage.getItem(LS_KEYS.recordings) || "{}");
-  const list = recs[currentCard?.id || "misc"] || [];
-  list.push({ when: new Date().toISOString(), target, url, notes });
-  recs[currentCard?.id || "misc"] = list;
-  localStorage.setItem(LS_KEYS.recordings, JSON.stringify(recs));
-  $("#rec-notes").value = "";
-  renderRecHistory();
-  addXP(5);
-}
-function renderRecHistory() {
-  const recs = JSON.parse(localStorage.getItem(LS_KEYS.recordings) || "{}");
-  const list = recs[currentCard?.id || "misc"] || [];
-  $("#rec-history").innerHTML = list.slice(-5).map(r => `<div class="muted">${new Date(r.when).toLocaleString()} — ${r.target} <audio src="${r.url}" controls></audio> <em>${r.notes||""}</em></div>`).join("");
-}
-
-// ===== Tag progress
-function renderTagProgress() {
-  const prog = loadProgress();
-  const counts = {};
-  for (const w of WORDS) {
-    counts[w.tag] = counts[w.tag] || { learned: 0, total: 0 };
-    counts[w.tag].total++;
-    if (prog[w.id]) counts[w.tag].learned++;
-  }
-  const dom = $("#tag-progress");
-  dom.innerHTML = Object.entries(counts).map(([tag, c]) => {
-    const pct = Math.round((c.learned / c.total) * 100);
-    return `<div>${tag}: ${c.learned}/${c.total} (${pct}%)</div>`;
-  }).join("");
-}
-
-// ===== Bake data now (fetch + save + download baked file)
-async function bakeDataNow() {
-  const log = (msg)=> { const l = $("#bake-log"); if (l) l.textContent += msg + "\n"; const s = $("#bake-status"); if (s) s.textContent = msg; };
-  log("Fetching official HSK1 (500) JSON...");
-  try {
-    const res = await fetch(RAW_DATA_URL, { cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    localStorage.setItem(LS_KEYS.offlineWords, JSON.stringify(data));
-    log("Saved to Offline Pack (browser storage).");
-    // offer a baked file for replacing /data/hsk1_500.json
-    const baked = JSON.stringify(data);
-    downloadFile("hsk1_500.json", "application/json", baked);
-    log("Downloaded 'hsk1_500.json'. Replace the one in the app's /data folder.");
-    // refresh app words in-session
-    WORDS = data.map((entry, idx) => normalizeEntry(entry, idx));
-    rebuildTodayQueue();
-    renderTagProgress();
-    updateDashboard();
-  } catch (e) {
-    log("Failed to fetch now. Ensure you're online and try again.");
-  }
-}
-
-function downloadCurrentDataset() {
-  const baked = WORDS.length ? JSON.stringify(WORDS, null, 2) : "[]";
-  downloadFile("current_dataset.json", "application/json", baked);
-}
-
-function downloadFile(name, mime, content) {
-  const blob = new Blob([content], {type: mime});
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-}
-
-// ===== Offline Stroke Cache
-async function cacheStrokes() {
-  const log = (msg)=> { const l = $("#stroke-log"); if (l) l.textContent += msg + "\n"; const s = $("#stroke-status"); if (s) s.textContent = msg; };
-  if (WORDS.length < 10) { log("Load/bake dataset first."); return; }
-  const uniqueChars = Array.from(new Set(WORDS.flatMap(w => [...w.hanzi]))).filter(ch => ch.trim());
-  let ok = 0, fail = 0;
-  for (const ch of uniqueChars) {
-    const code = ch.codePointAt(0).toString(16);
-    if (localStorage.getItem(LS_KEYS.strokePrefix + code)) { ok++; continue; }
-    try {
-      const url = `https://cdn.jsdelivr.net/npm/hanzi-writer-data@latest/${code}.json`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      localStorage.setItem(LS_KEYS.strokePrefix + code, JSON.stringify(data));
-      ok++;
-      log(`Cached ${ch} (${code}) — ${ok}/${uniqueChars.length}`);
-      await new Promise(r => setTimeout(r, 30)); // throttle a bit
-    } catch (e) {
-      fail++; log(`Skip ${ch}: ${e}`);
-    }
-  }
-  log(`Done. Cached ${ok}/${uniqueChars.length}.`);
-}
-
-// Hook Hanzi Writer to use local cache first
-function charDataLoader(char, onComplete) {
-  const code = char.codePointAt(0).toString(16);
-  const key = LS_KEYS.strokePrefix + code;
-  const cached = localStorage.getItem(key);
-  if (cached) {
-    onComplete(JSON.parse(cached));
-    return;
-  }
-  // Fallback to CDN
-  fetch(`https://cdn.jsdelivr.net/npm/hanzi-writer-data@latest/${code}.json`)
-    .then(r => r.json()).then(d => onComplete(d))
-    .catch(()=> onComplete(null));
-}
-
-// ===== Guided session (same structure as v1.1)
-let guidedTimer = null, guidedEndAt = null, guidedStageIndex = -1;
-const GUIDED_STAGES = [
-  { type: "new", count: 15 },
-  { type: "review" },
-  { type: "quiz", mode: "typing" },
-  { type: "quiz", mode: "listening" },
-  { type: "quiz", mode: "cloze" },
-];
-
-function beginGuided() {
-  guidedStageIndex = -1;
-  startTimer(settings.sessionMins || 60);
-  nextGuidedStage();
-}
-function endGuided() { stopTimer(); showGuidedRecap(); }
-function nextGuidedStage() {
-  guidedStageIndex++;
-  if (guidedStageIndex >= GUIDED_STAGES.length) return endGuided();
-  const stage = GUIDED_STAGES[guidedStageIndex];
-  $("#guided-stage").textContent = `Stage ${guidedStageIndex+1}/${GUIDED_STAGES.length} — ${stage.type.toUpperCase()}`;
-  runStage(stage);
-}
-function runStage(stage) {
-  const area = $("#guided-area");
-  area.innerHTML = "";
-  if (stage.type === "new" || stage.type === "review") {
-    rebuildTodayQueue(stage.type === "new");
-    area.appendChild($("#study").cloneNode(true));
-    nextCard();
-    const finishBtn = document.createElement("button");
-    finishBtn.textContent = "Finish stage";
-    finishBtn.className = "primary";
-    finishBtn.onclick = nextGuidedStage;
-    area.appendChild(finishBtn);
-  } else if (stage.type === "quiz") {
-    const qbox = document.createElement("div");
-    qbox.id = "guided-quiz";
-    area.appendChild(qbox);
-    const original = document.getElementById("quiz-area"); const originalId = original.id;
-    original.id = "quiz-area-original";
-    const tempDiv = document.createElement("div"); tempDiv.id = "quiz-area"; qbox.appendChild(tempDiv);
-    startQuiz(stage.mode);
-    const finishBtn = document.createElement("button");
-    finishBtn.textContent = "Finish stage";
-    finishBtn.className = "primary";
-    finishBtn.onclick = () => { tempDiv.remove(); original.id = originalId; nextGuidedStage(); };
-    qbox.appendChild(finishBtn);
-  }
-}
-function startTimer(mins) {
-  const end = Date.now() + mins*60*1000; guidedEndAt = end;
-  if (guidedTimer) clearInterval(guidedTimer);
-  tickTimer(); guidedTimer = setInterval(tickTimer, 1000);
-}
-function stopTimer() { if (guidedTimer) clearInterval(guidedTimer); guidedTimer = null; }
-function tickTimer() {
-  const remain = Math.max(0, guidedEndAt - Date.now());
-  const m = Math.floor(remain/60000).toString().padStart(2,"0");
-  const s = Math.floor((remain%60000)/1000).toString().padStart(2,"0");
-  $("#guided-timer").textContent = `${m}:${s}`;
-  if (remain <= 0) endGuided();
-}
-function showGuidedRecap() {
-  const box = $("#guided-recap"); box.classList.remove("hidden");
-  const prog = loadProgress(); const learned = Object.keys(prog).length;
-  box.innerHTML = `<strong>Session done!</strong> Words learned so far: ${learned}.`;
-}
-
-// ===== Stroke UI init
-let writer, strokeIndex = 0;
-function initStrokeUI() {
-  const wbox = document.getElementById("writer");
-  if (!wbox || !window.HanziWriter) return;
-  try {
-    writer = HanziWriter.create("writer", "你", {
-      width: 320, height: 320, padding: 10, showCharacter: true, strokeAnimationSpeed: 1.2,
-      charDataLoader: (char, ok)=> charDataLoader(char, ok)
-    });
-    document.getElementById("stroke-play").onclick = () => writer.animateCharacter();
-    document.getElementById("stroke-prev").onclick = () => { stepChar(-1); };
-    document.getElementById("stroke-next").onclick = () => { stepChar(1); };
-    updateStrokeChar();
-  } catch (e) {
-    wbox.innerHTML = "<div class='muted' style='padding:12px'>Stroke animation requires internet or the cache. Use Cache strokes button.</div>";
-  }
-}
-function updateStrokeChar() {
-  if (!writer || WORDS.length === 0) return;
-  const idx = Math.max(0, Math.min(WORDS.length-1, strokeIndex));
-  const ch = WORDS[idx].hanzi[0];
-  writer.setCharacter(ch);
-}
-function stepChar(delta) {
-  strokeIndex += delta;
-  if (strokeIndex < 0) strokeIndex = 0;
-  if (strokeIndex >= WORDS.length) strokeIndex = WORDS.length-1;
-  updateStrokeChar();
-}
 
 // ===== Import/Export CSV
 function exportCSV() {
@@ -708,7 +450,7 @@ function importCSV(evt) {
   const reader = new FileReader();
   reader.onload = () => {
     const lines = reader.result.split(/\r?\n/).filter(Boolean);
-    const header = lines.shift();
+    lines.shift();
     const prog = loadProgress();
     for (const line of lines) {
       const cols = parseCSVLine(line);
@@ -734,17 +476,20 @@ function parseCSVLine(s) {
     else if (ch === "," && !inQ) { out.push(cur); cur=""; }
     else cur += ch;
   }
-  out.push(cur);
-  return out;
+  out.push(cur); return out;
+}
+function downloadFile(name, mime, content) {
+  const blob = new Blob([content], {type: mime});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
 }
 
 // ===== Speech
 function speak(text, rate=1) {
-  if (!window.speechSynthesis) { alert("No speech synthesis support."); return; }
+  if (!window.speechSynthesis) { alert("Speech synthesis not supported."); return; }
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "zh-CN"; u.rate = rate;
   speechSynthesis.speak(u);
 }
-
-// ===== Service Worker helper
-// (sw.js caches app shell + data/hsk1_500.json to make the app fully offline)
