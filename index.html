@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HSK 1 — Study App v1.2</title>
+  <link rel="stylesheet" href="styles.css" />
+  <meta name="theme-color" content="#0b0f14">
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="logo">HSK 1 · 500 — v1.2</div>
+      <nav class="tabs">
+        <button class="tab active" data-tab="dashboard">Dashboard</button>
+        <button class="tab" data-tab="guided">Guided</button>
+        <button class="tab" data-tab="study">Study</button>
+        <button class="tab" data-tab="quiz">Quizzes</button>
+        <button class="tab" data-tab="stroke">Stroke Order</button>
+        <button class="tab" data-tab="record">Speaking</button>
+        <button class="tab" data-tab="progress">Progress</button>
+        <button class="tab" data-tab="settings">Settings</button>
+        <button class="tab" data-tab="data">Data</button>
+        <button class="tab" data-tab="importexport">Import/Export</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="dashboard" class="panel active">
+        <h1>Welcome 👋</h1>
+        <p>New HSK 3.0 Band 1 — 500 words. Everything stays on-device.</p>
+        <div class="cards">
+          <div class="card">
+            <div class="card-title">Today</div>
+            <div class="card-body">
+              <div id="today-stats"></div>
+              <button id="start-15" class="primary">Start · 15 new</button>
+              <button id="start-reviews" class="ghost">Review due</button>
+              <button id="start-guided" class="ghost">Start Guided (60m)</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Gamify</div>
+            <div class="card-body">
+              <div id="streak">Streak: 0🔥</div>
+              <div id="xp">XP: 0 · Level 1</div>
+              <div id="badges" class="badges"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Offline</div>
+            <div class="card-body">
+              <button id="bake-data" class="primary">Bake data now</button>
+              <div class="muted" id="bake-status">Local dataset: placeholder (click to bake)</div>
+              <button id="cache-strokes" class="ghost">Cache strokes (offline)</button>
+              <div class="muted" id="stroke-status">Strokes cached: 0</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="guided" class="panel">
+        <div class="guided-wrap">
+          <div class="guided-head">
+            <div><strong>Guided Session</strong> — 60 minutes · 15 new + reviews + 3 quizzes</div>
+            <div id="guided-timer">60:00</div>
+          </div>
+          <div id="guided-stage" class="muted">Ready</div>
+          <div id="guided-area"></div>
+          <div class="guided-controls">
+            <button id="guided-begin" class="primary">Begin</button>
+            <button id="guided-skip" class="ghost">Skip</button>
+            <button id="guided-end" class="ghost">End</button>
+          </div>
+          <div id="guided-recap" class="recap hidden"></div>
+        </div>
+      </section>
+
+      <section id="study" class="panel">
+        <div class="study-wrap">
+          <div id="card-area" class="flashcard">
+            <div id="card-front" class="card-side">
+              <div id="hanzi" class="hanzi">你好</div>
+              <div class="hint">Tap to reveal</div>
+            </div>
+            <div id="card-back" class="card-side hidden">
+              <div id="pinyin" class="pinyin">nǐ hǎo</div>
+              <div id="english" class="english">hello</div>
+              <div id="example" class="example">你好！</div>
+              <div class="audio-row">
+                <button id="speak-word">🔊 Word</button>
+                <button id="speak-sent">🔊 Sentence</button>
+                <select id="rate">
+                  <option value="0.5">0.5×</option>
+                  <option value="1" selected>1×</option>
+                  <option value="1.5">1.5×</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="srs-row">
+            <button class="srs-btn again" data-grade="0">Again</button>
+            <button class="srs-btn hard" data-grade="3">Hard</button>
+            <button class="srs-btn good" data-grade="4">Good</button>
+            <button class="srs-btn easy" data-grade="5">Easy</button>
+          </div>
+
+          <div class="queue-info" id="queue-info">Queue — New: 0 · Review: 0</div>
+        </div>
+      </section>
+
+      <section id="quiz" class="panel">
+        <h2>Quizzes</h2>
+        <div class="quiz-controls">
+          <button data-quiz="mcq" class="primary">Multiple Choice</button>
+          <button data-quiz="typing" class="ghost">Typing (Pinyin w/ tones)</button>
+          <button data-quiz="listening" class="ghost">Listening</button>
+          <button data-quiz="matching" class="ghost">Matching</button>
+          <button data-quiz="cloze" class="ghost">Cloze (Missing word)</button>
+        </div>
+        <div id="quiz-area"></div>
+        <div id="quiz-recap" class="recap hidden"></div>
+      </section>
+
+      <section id="stroke" class="panel">
+        <h2>Stroke Order</h2>
+        <p class="muted">Animated stroke order (works offline after you cache once).</p>
+        <div id="writer" style="width:320px;height:320px;margin:auto;border:1px dashed var(--border);"></div>
+        <div class="row" style="display:flex;gap:8px;justify-content:center;margin-top:8px">
+          <button id="stroke-prev" class="ghost">Prev</button>
+          <button id="stroke-play" class="primary">Animate</button>
+          <button id="stroke-next" class="ghost">Next</button>
+        </div>
+        <script src="https://unpkg.com/hanzi-writer@3.6.0/dist/hanzi-writer.min.js"></script>
+      </section>
+
+      <section id="record" class="panel">
+        <h2>Speaking — Record & Compare</h2>
+        <p>Record yourself saying the word or the example sentence. You can self-rate and save notes.</p>
+        <div class="recorder">
+          <select id="speak-target">
+            <option value="word">Current word</option>
+            <option value="sentence">Example sentence</option>
+          </select>
+          <div class="rec-controls">
+            <button id="rec-start">⏺️ Record</button>
+            <button id="rec-stop" disabled>⏹️ Stop</button>
+            <audio id="rec-playback" controls></audio>
+          </div>
+          <div class="self-rate">
+            <span>Self-rating:</span>
+            <button class="rate" data-rate="1">⭐</button>
+            <button class="rate" data-rate="2">⭐⭐</button>
+            <button class="rate" data-rate="3">⭐⭐⭐</button>
+            <button class="rate" data-rate="4">⭐⭐⭐⭐</button>
+            <button class="rate" data-rate="5">⭐⭐⭐⭐⭐</button>
+          </div>
+          <textarea id="rec-notes" placeholder="Pronunciation notes..."></textarea>
+          <button id="rec-save" class="primary">Save to card</button>
+          <div id="rec-history"></div>
+        </div>
+      </section>
+
+      <section id="progress" class="panel">
+        <h2>Progress</h2>
+        <div id="progress-stats"></div>
+        <canvas id="progress-chart" width="600" height="240"></canvas>
+        <div class="tags">
+          <h3>By Tag</h3>
+          <div id="tag-progress"></div>
+        </div>
+      </section>
+
+      <section id="settings" class="panel">
+        <h2>Settings</h2>
+        <div class="settings-grid">
+          <label>New cards / day
+            <input id="new-per-day" type="number" min="1" max="100" value="15" />
+          </label>
+          <label>Max reviews / day
+            <input id="max-reviews" type="number" min="20" max="999" value="999" />
+          </label>
+          <label>Session length target (minutes)
+            <input id="session-mins" type="number" min="5" max="180" value="60" />
+          </label>
+          <label>Show pinyin by default
+            <input id="show-pinyin" type="checkbox" checked />
+          </label>
+          <label>Dark theme
+            <input id="dark-theme" type="checkbox" checked />
+          </label>
+        </div>
+        <p class="muted">All data (progress, recordings) stays in your browser.</p>
+      </section>
+
+      <section id="data" class="panel">
+        <h2>Data</h2>
+        <div class="cards">
+          <div class="card">
+            <div class="card-title">HSK 1 — Dataset</div>
+            <div class="card-body">
+              <p class="muted">Local baked file: <code>data/hsk1_500.json</code>. You can replace it any time.</p>
+              <button id="download-dataset" class="ghost">Download current dataset</button>
+              <button id="bake-data-2" class="primary">Bake data now</button>
+              <div id="bake-log" class="muted" style="white-space:pre-wrap"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Stroke Data</div>
+            <div class="card-body">
+              <p class="muted">Click once while online to cache stroke data for all characters in Band 1.</p>
+              <button id="cache-strokes-2" class="primary">Cache strokes (offline)</button>
+              <div id="stroke-log" class="muted" style="white-space:pre-wrap"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="importexport" class="panel">
+        <h2>Import / Export</h2>
+        <div class="import-export">
+          <button id="export-csv" class="ghost">Export progress CSV</button>
+          <input type="file" id="import-csv" accept=".csv" />
+          <label for="import-csv" class="primary">Import CSV</label>
+        </div>
+        <p class="muted">Format: simplified,pinyin,english,pos,tag</p>
+      </section>
+    </main>
+
+    <footer>
+      <div>Built for you · v1.2</div>
+      <div class="tiny muted">Install to Home Screen for an app-like experience. Offline supported.</div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+    }
+  </script>
+</body>
+</html>
